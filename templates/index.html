@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ReceiptReader | Neural Scanner</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    
+    <style>
+        /* CSS Variables for the Neon/Glassmorphism Theme */
+        :root {
+            --bg-color: #050505;
+            --glass-bg: rgba(20, 20, 25, 0.6);
+            --glass-border: rgba(255, 255, 255, 0.08);
+            --primary-glow: #00f2ff; /* Cyan */
+            --secondary-glow: #bd00ff; /* Purple */
+            --text-main: #ffffff;
+            --text-muted: #a0a0a0;
+            --success-color: #00ff9d;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            background-image: 
+                radial-gradient(circle at 15% 50%, rgba(189, 0, 255, 0.08), transparent 25%),
+                radial-gradient(circle at 85% 30%, rgba(0, 242, 255, 0.08), transparent 25%);
+            color: var(--text-main);
+            font-family: 'Inter', sans-serif;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-x: hidden;
+        }
+
+        /* Ambient Background Animation using SVG */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.03'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+            pointer-events: none;
+            z-index: -1;
+        }
+
+        .container {
+            max-width: 1200px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            padding: 2rem;
+        }
+
+        /* Glassmorphism Cards: Blurry background with transparency */
+        .glass-panel {
+            background: var(--glass-bg);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid var(--glass-border);
+            border-radius: 24px;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .glass-panel:hover {
+            box-shadow: 0 12px 40px 0 rgba(0, 0, 0, 0.7);
+            border-color: rgba(255, 255, 255, 0.15);
+        }
+
+        /* Typography */
+        h1, h2, h3, h4, h5 {
+            font-weight: 800;
+            letter-spacing: -0.5px;
+        }
+        
+        .hero-title {
+            font-size: 4rem;
+            background: linear-gradient(135deg, #fff 0%, #a5a5a5 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 0 30px rgba(255,255,255,0.1);
+        }
+
+        .text-neon-blue { color: var(--primary-glow); text-shadow: 0 0 10px rgba(0, 242, 255, 0.4); }
+        .text-neon-purple { color: var(--secondary-glow); text-shadow: 0 0 10px rgba(189, 0, 255, 0.4); }
+        .text-neon-green { color: var(--success-color); text-shadow: 0 0 10px rgba(0, 255, 157, 0.4); }
+
+        /* Custom Button Styling with Glow Effects */
+        .btn-glow {
+            background: linear-gradient(135deg, rgba(255,255,255,0.1), rgba(255,255,255,0.05));
+            border: 1px solid rgba(255,255,255,0.2);
+            color: white;
+            backdrop-filter: blur(4px);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn-glow:hover {
+            background: rgba(255,255,255,0.15);
+            border-color: white;
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 0 20px rgba(255,255,255,0.1);
+        }
+
+        .btn-primary-neon {
+            background: linear-gradient(90deg, var(--secondary-glow), var(--primary-glow));
+            border: none;
+            color: white;
+            font-weight: 700;
+            position: relative;
+            z-index: 1;
+        }
+
+        .btn-primary-neon::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: linear-gradient(90deg, var(--primary-glow), var(--secondary-glow));
+            opacity: 0;
+            z-index: -1;
+            transition: opacity 0.3s ease;
+        }
+
+        .btn-primary-neon:hover::before { opacity: 1; }
+        .btn-primary-neon:hover {
+            box-shadow: 0 0 30px rgba(189, 0, 255, 0.4);
+            transform: scale(1.02);
+            color: white;
+        }
+
+        /* Drag & Drop Zone Styling */
+        .drop-zone {
+            border: 2px dashed rgba(255,255,255,0.2);
+            background: rgba(0,0,0,0.2);
+            border-radius: 16px;
+            transition: all 0.3s ease;
+        }
+        
+        .drop-zone:hover, .drop-zone.dragover {
+            border-color: var(--primary-glow);
+            background: rgba(0, 242, 255, 0.05);
+            box-shadow: inset 0 0 20px rgba(0, 242, 255, 0.1);
+        }
+
+        /* Table Styles */
+        .table-dark-glass {
+            --bs-table-bg: transparent;
+            --bs-table-color: var(--text-main);
+            --bs-table-border-color: rgba(255,255,255,0.1);
+        }
+        
+        .table-dark-glass th {
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.85rem;
+            letter-spacing: 1px;
+            color: var(--text-muted);
+            border-bottom: 2px solid rgba(255,255,255,0.1);
+        }
+
+        .table-dark-glass td {
+            vertical-align: middle;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.95rem;
+        }
+
+        .table-hover tbody tr:hover {
+            background: rgba(255,255,255,0.05);
+            box-shadow: inset 2px 0 0 var(--primary-glow);
+        }
+
+        /* Utilities */
+        .hidden { display: none !important; }
+        .fade-in { animation: fadeIn 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); filter: blur(10px); }
+            to { opacity: 1; transform: translateY(0); filter: blur(0); }
+        }
+
+        .spinner-neon {
+            border-color: var(--primary-glow);
+            border-right-color: transparent;
+        }
+
+        /* Progress Bar */
+        .progress {
+            background: rgba(255,255,255,0.1);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        .progress-bar {
+            background: linear-gradient(90deg, var(--secondary-glow), var(--primary-glow));
+            box-shadow: 0 0 15px var(--primary-glow);
+        }
+    </style>
+</head>
+<body>
+
+<div class="container" id="mainContainer">
+    
+    <!-- ==================== STEP 1: INITIALIZATION ==================== -->
+    <!-- This screen appears first to load the heavy OCR model into memory -->
+    <div id="step1-init" class="text-center fade-in" style="margin-top: 10vh;">
+        <div class="mb-5 position-relative">
+            <div class="position-absolute top-50 start-50 translate-middle" style="width: 200px; height: 200px; background: var(--secondary-glow); filter: blur(100px); opacity: 0.4; z-index: -1;"></div>
+            <h1 class="hero-title mb-2">ReceiptReader</h1>
+            <p class="lead" style="color: var(--text-muted);">Next-Gen Neural OCR Receipt Scanner</p>
+        </div>
+        
+        <div class="glass-panel p-5 mx-auto" style="max-width: 500px;">
+            <div class="mb-5">
+                <div class="spinner-border spinner-neon mb-3 hidden" id="loadingSpinner" role="status" style="width: 3rem; height: 3rem; border-width: 4px;"></div>
+                <div id="iconPlaceholder" style="font-size: 4rem; text-shadow: 0 0 30px rgba(255,255,255,0.3);">⚡</div>
+            </div>
+            
+            <h3 class="fw-bold mb-3 text-white">System Standby</h3>
+            <p class="mb-4" style="color: #888;">Initialize neural networks for high-precision extraction.</p>
+            
+            <button id="btnLoadModel" class="btn btn-primary-neon w-100 py-3 rounded-pill shadow-lg" style="font-size: 1.1rem; letter-spacing: 1px;">
+                INITIALIZE SYSTEM
+            </button>
+            
+            <div id="initProgress" class="mt-4 hidden text-start">
+                <div class="d-flex justify-content-between mb-2">
+                    <span class="small text-neon-blue fw-bold">LOADING MODELS</span>
+                    <span class="small text-muted">PaddleOCR v2.9</span>
+                </div>
+                <div class="progress" style="height: 4px;">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 100%"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== STEP 2: WORKSPACE ==================== -->
+    <!-- This screen appears after the model is loaded. Contains DropZone and Results. -->
+    <div id="step2-workspace" class="hidden w-100 fade-in">
+        <!-- Header -->
+        <div class="d-flex justify-content-between align-items-center mb-5 border-bottom border-dark pb-3" style="border-color: rgba(255,255,255,0.1) !important;">
+            <div class="d-flex align-items-center gap-3">
+                <div class="bg-dark rounded-circle d-flex align-items-center justify-content-center border border-secondary" style="width: 40px; height: 40px;">
+                    <span style="font-size: 1.2rem;">📊</span>
+                </div>
+                <div>
+                    <h4 class="fw-bold m-0 text-white">Workspace</h4>
+                    <p class="small m-0 text-muted">Session Active</p>
+                </div>
+            </div>
+            <button id="btnReset" class="btn btn-glow btn-sm px-3 rounded-pill d-flex align-items-center gap-2 text-danger">
+                <span>✕</span> Clear Session
+            </button>
+        </div>
+
+        <div class="row g-4">
+            <!-- Left Column: Upload Area -->
+            <div class="col-lg-5">
+                <div class="glass-panel h-100 p-4 d-flex flex-column">
+                    <h6 class="text-uppercase text-muted fw-bold mb-4" style="letter-spacing: 1px; font-size: 0.75rem;">01. Data Ingestion</h6>
+                    
+                    <div id="dropZone" class="drop-zone flex-fill d-flex flex-column justify-content-center align-items-center p-4 text-center cursor-pointer">
+                        <div class="mb-3 p-3 rounded-circle" style="background: rgba(255,255,255,0.05);">
+                            <svg width="40" height="40" fill="none" stroke="currentColor" viewBox="0 0 24 24" class="text-neon-blue"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+                        </div>
+                        <h5 class="fw-bold text-white mb-2">Upload Receipts</h5>
+                        <p class="small text-muted mb-0">Drag & Drop JPG/PNG files here<br>or click to browse</p>
+                        <input type="file" id="fileInput" multiple accept="image/*" class="hidden">
+                    </div>
+                    
+                    <div id="uploadInfo" class="mt-4 text-center hidden">
+                        <div class="d-inline-flex align-items-center gap-2 px-3 py-2 rounded-pill" style="background: rgba(0, 255, 157, 0.1); border: 1px solid rgba(0, 255, 157, 0.2);">
+                             <span class="text-neon-green">●</span>
+                             <span class="text-white small"><span id="uploadCount" class="fw-bold">0</span> images ready</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Column: Controls Area -->
+            <div class="col-lg-7">
+                <div class="glass-panel h-100 p-4 d-flex flex-column">
+                    <h6 class="text-uppercase text-muted fw-bold mb-4" style="letter-spacing: 1px; font-size: 0.75rem;">02. Processing Unit</h6>
+                    
+                    <div class="flex-fill d-flex flex-column justify-content-center">
+                        <button id="btnScan" class="btn btn-primary-neon btn-lg w-100 py-3 mb-4 rounded-3" disabled>
+                            INITIATE SCAN
+                        </button>
+
+                        <!-- Progress Bar (Visible during scanning) -->
+                        <div id="scanProgressContainer" class="hidden mb-4">
+                            <div class="d-flex justify-content-between mb-2 font-monospace small">
+                                <span class="text-neon-blue" id="scanStatusText">ANALYZING...</span>
+                                <span class="text-white" id="scanCounter">0/0</span>
+                            </div>
+                            <div class="progress" style="height: 6px;">
+                                <div id="scanProgressBar" class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%"></div>
+                            </div>
+                        </div>
+
+                        <!-- Export Actions (Visible after scanning) -->
+                        <div id="resultsActions" class="d-grid gap-3 hidden">
+                            <a href="/download/excel" class="btn btn-glow d-flex justify-content-between align-items-center py-3 px-4 rounded-3 text-start">
+                                <div>
+                                    <div class="fw-bold">Export Dataset</div>
+                                    <div class="small text-muted" style="font-size: 0.75rem;">.XLSX Format</div>
+                                </div>
+                                <span style="font-size: 1.5rem;">📥</span>
+                            </a>
+                            <a href="/download/txt" class="btn btn-glow d-flex justify-content-between align-items-center py-3 px-4 rounded-3 text-start">
+                                <div>
+                                    <div class="fw-bold">System Logs</div>
+                                    <div class="small text-muted" style="font-size: 0.75rem;">Raw OCR Text</div>
+                                </div>
+                                <span style="font-size: 1.5rem;">📄</span>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Results Table (Populated dynamically) -->
+        <div id="resultsSection" class="glass-panel mt-4 hidden p-4">
+            <h6 class="text-uppercase text-muted fw-bold mb-4" style="letter-spacing: 1px; font-size: 0.75rem;">Live Data Feed</h6>
+            <div class="table-responsive">
+                <table class="table table-dark-glass table-hover align-middle" id="resultsTable">
+                    <thead>
+                        <tr>
+                            <th>File ID</th>
+                            <th>Timestamp</th>
+                            <th>Vendor Entity</th>
+                            <th class="text-end">Value</th>
+                            <th>Curr</th>
+                            <th>Location</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Data rows injected here via JS -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- Bootstrap JS -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    // --- Elements ---
+    const step1 = document.getElementById('step1-init');
+    const step2 = document.getElementById('step2-workspace');
+    const container = document.getElementById('mainContainer');
+    
+    const btnLoadModel = document.getElementById('btnLoadModel');
+    const initProgress = document.getElementById('initProgress');
+    const iconPlaceholder = document.getElementById('iconPlaceholder');
+    const loadingSpinner = document.getElementById('loadingSpinner');
+    
+    const dropZone = document.getElementById('dropZone');
+    const fileInput = document.getElementById('fileInput');
+    const uploadInfo = document.getElementById('uploadInfo');
+    const uploadCount = document.getElementById('uploadCount');
+    const btnReset = document.getElementById('btnReset');
+    
+    const btnScan = document.getElementById('btnScan');
+    const scanProgressContainer = document.getElementById('scanProgressContainer');
+    const scanProgressBar = document.getElementById('scanProgressBar');
+    const scanStatusText = document.getElementById('scanStatusText');
+    const scanCounter = document.getElementById('scanCounter');
+    const resultsActions = document.getElementById('resultsActions');
+    
+    const resultsSection = document.getElementById('resultsSection');
+    const resultsTableBody = document.querySelector('#resultsTable tbody');
+
+    // --- State ---
+    let filesUploaded = false;
+
+    // --- 1. Initialization Step Logic ---
+    // User clicks "Initialize System" -> calls /load_model -> waits for success
+    btnLoadModel.addEventListener('click', async () => {
+        // UI updates for loading state
+        btnLoadModel.disabled = true;
+        btnLoadModel.style.opacity = '0.5';
+        initProgress.classList.remove('hidden');
+        iconPlaceholder.classList.add('hidden');
+        loadingSpinner.classList.remove('hidden');
+        
+        try {
+            const res = await fetch('/load_model', { method: 'POST' });
+            const data = await res.json();
+            
+            if (data.status === 'success') {
+                setTimeout(() => {
+                    transitionToWorkspace();
+                }, 800);
+            } else {
+                alert("Error: " + data.message);
+                resetInitState();
+            }
+        } catch (e) {
+            alert("Network Error: " + e);
+            resetInitState();
+        }
+    });
+
+    function resetInitState() {
+        btnLoadModel.disabled = false;
+        btnLoadModel.style.opacity = '1';
+        initProgress.classList.add('hidden');
+        iconPlaceholder.classList.remove('hidden');
+        loadingSpinner.classList.add('hidden');
+    }
+
+    function transitionToWorkspace() {
+        step1.style.opacity = '0';
+        setTimeout(() => {
+            step1.style.display = 'none';
+            step2.classList.remove('hidden');
+            // Slight delay to allow display:block to apply before opacity transition
+            setTimeout(() => step2.style.opacity = '1', 10);
+            container.style.justifyContent = 'flex-start';
+            resetSession();
+        }, 500);
+    }
+
+    // --- 2. Workspace Logic ---
+
+    // Reset Session: Clears backend files and frontend UI
+    async function resetSession() {
+        try {
+            await fetch('/reset', { method: 'POST' });
+            filesUploaded = false;
+            uploadInfo.classList.add('hidden');
+            uploadCount.textContent = "0";
+            
+            btnScan.disabled = true;
+            btnScan.innerHTML = "INITIATE SCAN";
+            
+            scanProgressContainer.classList.add('hidden');
+            resultsActions.classList.add('hidden');
+            resultsSection.classList.add('hidden');
+            resultsTableBody.innerHTML = "";
+            scanProgressBar.style.width = "0%";
+            
+        } catch (e) {
+            console.error("Reset failed", e);
+        }
+    }
+    btnReset.addEventListener('click', resetSession);
+
+    // Upload Handling: Drag & Drop + File Selection
+    dropZone.addEventListener('click', () => fileInput.click());
+    dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragover'); });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+    dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('dragover');
+        handleFiles(e.dataTransfer.files);
+    });
+    fileInput.addEventListener('change', (e) => handleFiles(e.target.files));
+
+    async function handleFiles(files) {
+        if (!files.length) return;
+        const formData = new FormData();
+        for (let file of files) formData.append('files[]', file);
+        
+        try {
+            const res = await fetch('/upload', { method: 'POST', body: formData });
+            const data = await res.json();
+            if (data.status === 'success') {
+                filesUploaded = true;
+                uploadCount.textContent = data.count; 
+                uploadInfo.classList.remove('hidden');
+                btnScan.disabled = false;
+            }
+        } catch (e) { console.error(e); }
+    }
+
+    // Scan Logic: Trigger Scan -> Poll /status
+    btnScan.addEventListener('click', async () => {
+        btnScan.disabled = true;
+        btnScan.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> PROCESSING...';
+        scanProgressContainer.classList.remove('hidden');
+        resultsSection.classList.remove('hidden');
+        resultsTableBody.innerHTML = "";
+        resultsActions.classList.add('hidden');
+        
+        try {
+            const res = await fetch('/scan', { method: 'POST' });
+            if ((await res.json()).status === 'success') {
+                pollStatus();
+            }
+        } catch (e) { alert(e); btnScan.disabled = false; btnScan.innerHTML = "INITIATE SCAN"; }
+    });
+
+    function pollStatus() {
+        const interval = setInterval(async () => {
+            const res = await fetch('/status');
+            const state = await res.json();
+            
+            // Update Progress Bar
+            const pct = state.total > 0 ? (state.current / state.total) * 100 : 0;
+            scanProgressBar.style.width = pct + "%";
+            scanCounter.textContent = `${state.current}/${state.total}`;
+            scanStatusText.textContent = `ANALYZING DATA STREAM...`;
+            
+            // Incremental Table Update
+            updateTable(state.results);
+
+            // Completion Check
+            if (!state.is_scanning) {
+                clearInterval(interval);
+                scanStatusText.textContent = "PROCESS COMPLETE";
+                scanStatusText.classList.add('text-neon-green');
+                scanStatusText.classList.remove('text-neon-blue');
+                scanProgressBar.classList.remove('progress-bar-animated');
+                resultsActions.classList.remove('hidden');
+                btnScan.innerHTML = "SCAN NEW BATCH";
+                btnScan.disabled = false;
+            }
+        }, 1000);
+    }
+
+    function updateTable(results) {
+        resultsTableBody.innerHTML = "";
+        
+        let totalsByCurrency = {};
+
+        results.forEach(row => {
+            const tr = document.createElement('tr');
+            // Adding fade-in animation to rows
+            tr.style.animation = "fadeIn 0.5s ease forwards";
+            tr.innerHTML = `
+                <td class="text-muted" style="font-size: 0.85rem;">${row.filename}</td>
+                <td>${row.date}</td>
+                <td class="text-white">${row.vendor}</td>
+                <td class="text-end text-neon-green" style="font-weight: 700;">${row.total}</td>
+                <td class="text-muted">${row.currency}</td>
+                <td><small class="text-muted text-truncate" style="max-width: 150px; display: inline-block;">${row.location}</small></td>
+            `;
+            resultsTableBody.appendChild(tr);
+
+            // Accumulate totals
+            if (row.total && row.total !== 'null') {
+                let val = parseFloat(row.total);
+                let curr = row.currency || 'EUR';
+                if (!totalsByCurrency[curr]) totalsByCurrency[curr] = 0;
+                totalsByCurrency[curr] += val;
+            }
+        });
+
+        // Add summary rows at the bottom
+        if (Object.keys(totalsByCurrency).length > 0) {
+             const spacer = document.createElement('tr');
+             spacer.innerHTML = '<td colspan="6" style="height: 15px;"></td>';
+             resultsTableBody.appendChild(spacer);
+
+             for (let curr in totalsByCurrency) {
+                 const tr = document.createElement('tr');
+                 tr.classList.add('border-top', 'border-secondary');
+                 tr.style.background = 'rgba(255,255,255,0.03)';
+                 tr.innerHTML = `
+                    <td colspan="3" class="text-end fw-bold text-uppercase" style="letter-spacing:1px; font-size: 0.8rem;">Total (${curr})</td>
+                    <td class="text-end fw-bold fs-5 text-neon-green" style="text-shadow: 0 0 10px rgba(0,255,157,0.3);">${totalsByCurrency[curr].toFixed(2)}</td>
+                    <td class="fw-bold text-muted">${curr}</td>
+                    <td></td>
+                `;
+                resultsTableBody.appendChild(tr);
+            }
+        }
+    }
+
+    // Initialize session on page load
+    window.addEventListener('load', () => {
+        resetSession(); 
+    });
+
+</script>
+</body>
+</html>
